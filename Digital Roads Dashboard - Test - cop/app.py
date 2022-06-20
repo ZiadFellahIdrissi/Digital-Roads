@@ -2,6 +2,7 @@ import os
 import pathlib
 from pydoc import classname
 from cv2 import GC_INIT_WITH_MASK
+import dash_leaflet as dl
 
 import dash
 from dash import Dash, html, dcc
@@ -12,6 +13,8 @@ import dash_daq as daq
 import pandas as pd 
 import folium
 
+
+from itinerary_proposals import get_path_on_map
 from clustering_model import train_clustring_modal, data_processing
 
 app = Dash(
@@ -25,6 +28,8 @@ app.config["suppress_callback_exceptions"] = True
 app._favicon = "DR.ico"
 
 APP_PATH = str(pathlib.Path(__file__).parent.resolve())
+cites_in_MA = pd.read_csv(os.path.join(APP_PATH, os.path.join("data", "maroc_cites.csv")), sep=';')
+
 
 folium.Map(zoom_start=12).save("wordmap.html")
 
@@ -33,6 +38,7 @@ cities_base_final = pd.DataFrame()
 best_model = ""
 current_k = 0
 sunchart = {}
+points_to_vist = []
 
 suffix_row = "_row"
 suffix_button_id = "_button"
@@ -272,8 +278,6 @@ def build_top_panel(stopped_interval):
                                 children = []
                             ),
                             
-                        
-   
                         ], 
                         color="#119DFF",
                         type="dot",
@@ -322,7 +326,7 @@ def build_tab_itinerary():
         html.Div(
             id="set-specs-intro-container",
             children=html.P(
-                "Digital Roads will help you find best Itineraries in every City you want !"
+                "Digital Roads will help you find best Itinerarie in every City you want !"
             ),
         ),
         html.Div(
@@ -330,9 +334,45 @@ def build_tab_itinerary():
             children=[
                 html.Div(
                     id="metric-select-menu",
+                    # className='five columns',
+                    children = [
+                        html.H6("Choose Country"),
+                        dcc.Dropdown(
+                            id = 'select_country_iten',
+                            options = [
+                                {'label': 'Morocco', 'value': 'morocco'},
+                                {'label': 'Algeria', 'value': 'algeria'},
+                                {'label': 'Tunisia', 'value': 'tunisia'},
+                                {'label': 'Iraq', 'value': 'iraq'},
+                                {'label': 'Egypt', 'value': 'egypt'},
+                                {'label': 'Libya', 'value': 'libya'},
+                                {'label': 'Oman', 'value': 'oman'},
+                                {'label': 'Qatar', 'value': 'qatar'},
+                                {'label': 'United Kingdom', 'value': 'UK'},
+                                {'label': 'New Zealand', 'value': 'NZ'},
+                            ],
+                            value="morocco",
+                        ),
+                    ],
                 ),
                 html.Div(
                     id="value-setter-menu",
+                    # className='six columns',
+                    children = [
+                        html.H6("Choose city"),
+                        dcc.Dropdown(
+                            id = 'select_city_iten',
+                            options = [ ],
+                            value = "casablanca",
+                        ),
+                        html.Div(
+                            className = 'for_cluster_contianes',
+                            id = "map_choose",
+                            children = [],
+                            style = {},
+                        ),
+                        
+                    ],
                 ),
             ],
         ),
@@ -341,18 +381,74 @@ def build_tab_itinerary():
 
 
 
-# @app.callback(
-#     Output(component_id="cluster_contianes", component_property = "style"),
-#     [
-#         Input(component_id="btn-updt-map", component_property= "n_clicks")
-#     ],
+@app.callback(
+    Output(component_id="select_city_iten", component_property = "options"),
+    [
+        Input(component_id="select_country_iten", component_property= "value")
+    ],
 
-# )
-# def change_style(btn_update):
-#     if btn_update == 0:
-#         return {'display' : 'none'}
+)
+def cites_option(country):
+    return [{'label': col, 'value': col} for col in cites_in_MA.NAME2]
     
+
+
+@app.callback(
+    Output(component_id="map_choose", component_property = "children"),
+    [Input(component_id="select_city_iten", component_property= "value")],prevent_initial_call= True
+)
+def display_map_to_choose(city):
+    cordinates = cites_in_MA[cites_in_MA.NAME2 == city][["X","y"]]   
+    print(float(cordinates.y), float(cordinates.X))
+    html_com = html.Div(
+            className='let_client_choose',
+            id = "let_client_chos",
+            children = [
+                dl.Map(
+                    [dl.TileLayer(), dl.LayerGroup(id="layer")],
+                    zoom=10,
+                    center=(float(cordinates.y), float(cordinates.X)),
+                    id="map_client_want_choose",
+                    style={'width': '100%', 'height': '70vh', 'margin': "auto", "display": "block"}
+                    ),
+                html.Button(
+                    "Generate Itinerary",
+                    id="btn-get_itine",
+                    title="Click Generate Itinerary, computing could take up to minute to complete.",
+                    n_clicks=0,
+                ),
+                dcc.Graph(
+                    id="map_updated_for_itine",
+                    figure = {},
+                ), 
+            ]
+        )
+    return html_com
+
+
+
+@app.callback(
+    Output("layer", "children"), 
+    [Input("map_client_want_choose", "click_lat_lng")], prevent_initial_call= True
+)
+def map_click(click_lat_lng):
+    points_to_vist.append(tuple(click_lat_lng))
+    return [dl.Marker(position=[i[0], i[1]], children=dl.Tooltip("({:.3f}, {:.3f})".format(i[0], i[1]))) for i in points_to_vist]
     
+
+
+@app.callback(
+    Output(component_id="map_updated_for_itine", component_property = "figure"), 
+    [Input(component_id="btn-get_itine", component_property = "n_clicks")],
+    State(component_id="select_city_iten", component_property= "value"),
+    prevent_initial_call= True
+)
+def update_the_map_for_itenirers(get_itine, city):
+    if get_itine != 0:
+        fig =get_path_on_map(city+", Maroc", points_to_vist)
+        return fig
+    
+
 
 
 @app.callback(

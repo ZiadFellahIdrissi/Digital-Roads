@@ -16,6 +16,17 @@
   margin: 25% 25%;
 } */
 
+
+#map_choose{
+
+  margin: 2% 0% 5% ;
+}
+
+#btn-get_itine{
+  color: white;
+  margin: 2% 0% 2% ;
+}
+
 #btn-updt-map{
   color: white;
 }
