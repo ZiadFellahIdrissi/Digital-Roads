@@ -14,7 +14,7 @@ import pandas as pd
 import folium
 
 
-from itinerary_proposals import get_path_on_map
+from itinerary_proposals import get_path_on_map, generate_KPIs
 from clustering_model import train_clustring_modal, data_processing
 
 app = Dash(
@@ -39,6 +39,10 @@ best_model = ""
 current_k = 0
 sunchart = {}
 points_to_vist = []
+df_points = pd.DataFrame()
+G = None
+G_proj = None
+my_path_length = None
 
 suffix_row = "_row"
 suffix_button_id = "_button"
@@ -353,6 +357,13 @@ def build_tab_itinerary():
                             ],
                             value="morocco",
                         ),
+                        html.Div(
+                            className = 'for_cluster_contianes',
+                            id = "map_choose_KPI",
+                            children = [],
+                            style = {},
+                        ),
+
                     ],
                 ),
                 html.Div(
@@ -362,7 +373,7 @@ def build_tab_itinerary():
                         html.H6("Choose city"),
                         dcc.Dropdown(
                             id = 'select_city_iten',
-                            options = [ ],
+                            options = [],
                             value = "casablanca",
                         ),
                         html.Div(
@@ -394,36 +405,70 @@ def cites_option(country):
 
 
 @app.callback(
-    Output(component_id="map_choose", component_property = "children"),
+    [Output(component_id="map_choose", component_property = "children"), 
+     Output(component_id="map_choose_KPI", component_property = "children")],
     [Input(component_id="select_city_iten", component_property= "value")],prevent_initial_call= True
 )
 def display_map_to_choose(city):
     cordinates = cites_in_MA[cites_in_MA.NAME2 == city][["X","y"]]   
     print(float(cordinates.y), float(cordinates.X))
     html_com = html.Div(
-            className='let_client_choose',
-            id = "let_client_chos",
-            children = [
-                dl.Map(
-                    [dl.TileLayer(), dl.LayerGroup(id="layer")],
-                    zoom=10,
-                    center=(float(cordinates.y), float(cordinates.X)),
-                    id="map_client_want_choose",
-                    style={'width': '100%', 'height': '70vh', 'margin': "auto", "display": "block"}
-                    ),
-                html.Button(
-                    "Generate Itinerary",
-                    id="btn-get_itine",
-                    title="Click Generate Itinerary, computing could take up to minute to complete.",
-                    n_clicks=0,
+        className='let_client_choose',
+        id = "let_client_chos",
+        children = [
+            dl.Map(
+                [dl.TileLayer(), dl.LayerGroup(id="layer")],
+                zoom=10,
+                center=(float(cordinates.y), float(cordinates.X)),
+                id="map_client_want_choose",
+                style={'width': '100%', 'height': '70vh', 'margin': "auto", "display": "block"}
                 ),
-                dcc.Graph(
-                    id="map_updated_for_itine",
-                    figure = {},
-                ), 
-            ]
-        )
-    return html_com
+            html.Button(
+                "Export as KML",
+                id="btn-get_itine",
+                title="Click Generate Itinerary, computing could take up to minute to complete.",
+                n_clicks=0,
+            ),
+            dcc.Loading(
+                id="myspinnerformap_ti",
+                children=[
+                    dcc.Graph(
+                        id="map_updated_for_itine",
+                        figure = {},
+                        style={'display': 'none'}
+                    ), 
+                ],
+                color="#119DFF",
+                type="dot",
+                fullscreen=False,
+            )
+        ]
+    )
+    html_com_KPI = html.Div(
+        id = "Visualize_KPI",
+        children = [
+            dcc.Loading(
+                id="myspinnerforKPI_ti",
+                children=[
+                    dcc.Graph(
+                        id="type_of_routes_KPI",
+                        figure = {},
+                        style={'display': 'none'}
+                    ), 
+                    dcc.Graph(
+                        id="Number_of_obs_KPI",
+                        figure = {},
+                        style={'display': 'none'}
+                    ), 
+                ],
+                color="#119DFF",
+                type="dot",
+                fullscreen=False,
+            )
+            
+        ]
+    )
+    return html_com, html_com_KPI
 
 
 
@@ -438,17 +483,27 @@ def map_click(click_lat_lng):
 
 
 @app.callback(
-    Output(component_id="map_updated_for_itine", component_property = "figure"), 
+    [
+        Output(component_id="map_updated_for_itine", component_property = "figure"),
+        Output(component_id="map_updated_for_itine", component_property = "style"),
+
+        Output(component_id="type_of_routes_KPI", component_property = "figure"),
+        Output(component_id="type_of_routes_KPI", component_property = "style"),
+
+        Output(component_id="Number_of_obs_KPI", component_property = "figure"),
+        Output(component_id="Number_of_obs_KPI", component_property = "style"),
+    ],  
     [Input(component_id="btn-get_itine", component_property = "n_clicks")],
     State(component_id="select_city_iten", component_property= "value"),
     prevent_initial_call= True
 )
 def update_the_map_for_itenirers(get_itine, city):
     if get_itine != 0:
-        fig =get_path_on_map(city+", Maroc", points_to_vist)
-        return fig
+        fig, G_proj, my_path_length = get_path_on_map(city+", Maroc", points_to_vist)
+        fig_highways, fig_obstacls = generate_KPIs(G_proj, my_path_length)
+        return fig, {'display': 'block'}, fig_highways, {'display': 'block'}, fig_obstacls,  {'display': 'block'}
     
-
+    
 
 
 @app.callback(

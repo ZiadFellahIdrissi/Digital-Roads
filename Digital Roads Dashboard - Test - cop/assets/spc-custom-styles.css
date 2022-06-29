@@ -15,10 +15,17 @@
 /* #myspinner{
   margin: 25% 25%;
 } */
-
+#myspinnerforKPI_ti{
+  margin: 5% 0% 5% ;
+}
 
 #map_choose{
 
+  margin: 2% 0% 5% ;
+}
+
+
+#map_choose_KPI{
   margin: 2% 0% 5% ;
 }
 
