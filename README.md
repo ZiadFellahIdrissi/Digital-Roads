@@ -1,4 +1,4 @@
-# DIGITAL ROADS DASHBOAR
+# Digital Roads Dashboard
 
 ## Introduction
 `DIGITAL ROADS DASHBOAR` is a dashboard for cites clustering and suggesting of itineraries. 
